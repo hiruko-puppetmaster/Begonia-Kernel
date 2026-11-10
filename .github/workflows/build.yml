@@ -38,7 +38,7 @@ jobs:
   Build-Kernel:
     name: "🐎 Build kernel"
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'cvnertnc' && github.repository == 'cvnertnc/Begonia-Kernel-Builder'
+    if: github.repository == 'who-ssasori/Begonia-Kernel'
     needs:
       - Set-repos
     strategy:
