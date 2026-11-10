@@ -1,426 +1,363 @@
-# Config
-### By [PhamtomK12](https://github.com/PhamtomK12)
-## Github Action
-[![Build kernels](https://github.com/cvnertnc/Begonia-Kernel-Builder/actions/workflows/build.yml/badge.svg?event=workflow_dispatch)](https://github.com/cvnertnc/Begonia-Kernel-Builder/actions/workflows/build.yml)
+# Begonia Kernel Configuration
 
-This action contains two jobs: `Set-repos` and `Build-Kernel`.
+This repository builds kernel variants from JSON config files in the `repos/` folder. The GitHub workflow reads every file matching `repos/repos*.json`, combines them into a build matrix, and compiles one kernel per entry.
 
-The `Set-repos` job reads the kernel sources from the configuration file and outputs them to the `Build-Kernel` job. The `Build-Kernel` job uses the outputted kernel sources to build the kernels and upload the built kernel images.
+> The config format below reflects the current build system in this repo and is the source of truth for `repos/*.json`.
 
-#### Trigger
+## Quick overview
 
-| Event name        | Description  |
-| ----------------- | ------------ |
-| workflow_dispatch | Manually run |
+Each config entry describes:
 
-#### Workflow
+- the kernel source repository and branch
+- the target device and defconfig
+- root integration (`KernelSU`, `KernelSU-Next`, `SukiSU`, or none)
+- optional SUSFS and KPM patches
+- the compiler/toolchain used for the build
+- whether to package the output with AnyKernel3
 
-| Step                    | Description                                                                |
-| ----------------------- | -------------------------------------------------------------------------- |
-| Install prerequisites   | Install the necessary dependencies for building the kernel                 |
-| Setup Anykernel3        | Clone the Anykernel3 repository to prepare for packaging the kernel        |
-| Clone kernel source     | Clone the kernel source code repository for the Android device             |
-| Get toolchains          | Obtain the required cross-compilation toolchains for building the kernel   |
-| Set args                | Set the necessary build parameters for the kernel                          |
-| Update KernelSU         | Update the KernelSU tool to ensure compatibility with the new kernel       |
-| Make defconfig          | Generate the kernel configuration file                                     |
-| Build kernel            | Compile the kernel source code to create the kernel image                  |
-| Upload Image            | Upload the kernel image file to a designated location                      |
-| Upload Image.gz         | Upload the compressed kernel image file to a designated location           |
-| Upload dtb              | Upload the device tree blob file to a designated location                  |
-| Upload dtbo.img         | Upload the device tree overlay image file to a designated location         |
-| Pack AnyKernel3.zip     | Package the kernel image and device tree files into an Anykernel3 zip file |
-| Upload AnyKernel3 image | Upload the Anykernel3 zip file to a designated location                    |
-| Create GitHub Release   | Create a new release on GitHub to share the kernel with the community      |
+## File layout
 
-#### Configuration File Syntax
+```text
+repos/
+  repos.power.json
+```
 
-<details>
-  <summary>Example configuration file</summary>
-  
+A config file is usually an array of objects like this:
+
 ```json
 [
   {
+    "kernelName": "power",
     "kernelSource": {
-      "name": "DogDay-KernelSU-Proton-release",
-      "repo": "https://codeberg.org/DogDayAndroid/android_kernel_xiaomi_thyme",
-      "branch": "lineage-20.0",
-      "device": "thyme",
-      "defconfig": "thyme_defconfig"
+      "device": "begonia",
+      "defconfig": "begonia_user_defconfig",
+      "name": "Power-KSU-Next-SUSFS",
+      "repo": "https://github.com/Saikrishna1504/kernel_xiaomi_mt6785",
+      "branch": "bka"
     },
-    "withKernelSU": true,
+    "withRoot": "ksun",
+    "withSUSFS": true,
+    "whichSUSFS": "susfs-159",
+    "withKPM": false,
     "toolchains": [
       {
-        "repo": "https://github.com/kdrag0n/proton-clang",
-        "branch": "master",
-        "name": "proton-clang",
-        "binPath": ["bin"]
+        "repo": "https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r547379",
+        "branch": "15.0",
+        "name": "clang-crDroid",
+        "binPath": ["./bin"]
       }
     ],
-    "ccache":false,
+    "ccache": true,
     "params": {
       "ARCH": "arm64",
-      "CC": "proton-clang/bin/clang",
+      "CC": "clang-crDroid/bin/clang",
       "externalCommand": {
-        "CROSS_COMPILE": "proton-clang/bin/aarch64-linux-gnu-",
-        "CROSS_COMPILE_ARM32": "proton-clang/bin/arm-linux-gnueabi-",
-        "LD": "proton-clang/bin/ld.lld",
-        "AR": "proton-clang/bin/llvm-ar",
-        "NM": "proton-clang/bin/llvm-nm",
-        "OBJCOPY": "proton-clang/bin/llvm-objcopy",
-        "OBJDUMP": "proton-clang/bin/llvm-objdump",
-        "READELF": "proton-clang/bin/llvm-readelf",
-        "OBJSIZE": "proton-clang/bin/llvm-size",
-        "STRIP": "proton-clang/bin/llvm-strip",
-        "LDGOLD": "proton-clang/bin/aarch64-linux-gnu-ld.gold",
-        "LLVM_AR": "proton-clang/bin/llvm-ar",
-        "LLVM_DIS": "proton-clang/bin/llvm-dis"
-      }
-    },
-    "AnyKernel3": {
-      "use": true,
-      "release": true,
-      "repo": "https://github.com/easterNday/AnyKernel3/",
-      "branch": "thyme"
-    }
-  },
-  {
-    "kernelSource": {
-      "name": "DogDay-KernelSU-Proton-noanykernel-release",
-      "repo": "https://codeberg.org/DogDayAndroid/android_kernel_xiaomi_thyme",
-      "branch": "lineage-20.0",
-      "device": "thyme",
-      "defconfig": "thyme_defconfig"
-    },
-    "withKernelSU": true,
-    "toolchains": [
-      {
-        "repo": "https://github.com/kdrag0n/proton-clang",
-        "branch": "master",
-        "name": "proton-clang",
-        "binPath": ["bin"]
-      }
-    ],
-    "ccache":true,
-    "params": {
-      "ARCH": "arm64",
-      "CC": "proton-clang/bin/clang",
-      "externalCommand": {
-        "CROSS_COMPILE": "proton-clang/bin/aarch64-linux-gnu-",
-        "CROSS_COMPILE_ARM32": "proton-clang/bin/arm-linux-gnueabi-",
-        "LD": "proton-clang/bin/ld.lld",
-        "AR": "proton-clang/bin/llvm-ar",
-        "NM": "proton-clang/bin/llvm-nm",
-        "OBJCOPY": "proton-clang/bin/llvm-objcopy",
-        "OBJDUMP": "proton-clang/bin/llvm-objdump",
-        "READELF": "proton-clang/bin/llvm-readelf",
-        "OBJSIZE": "proton-clang/bin/llvm-size",
-        "STRIP": "proton-clang/bin/llvm-strip",
-        "LDGOLD": "proton-clang/bin/aarch64-linux-gnu-ld.gold",
-        "LLVM_AR": "proton-clang/bin/llvm-ar",
-        "LLVM_DIS": "proton-clang/bin/llvm-dis"
-      }
-    },
-    "AnyKernel3": {
-      "use": false,
-      "release": true,
-      "repo": "https://github.com/easterNday/AnyKernel3/",
-      "branch": "thyme"
-    }
-  },
-  {
-    "kernelSource": {
-      "name": "DogDay-KernelSU-Proton-anykernel-norelease",
-      "repo": "https://codeberg.org/DogDayAndroid/android_kernel_xiaomi_thyme",
-      "branch": "lineage-20.0",
-      "device": "thyme",
-      "defconfig": "thyme_defconfig"
-    },
-    "withKernelSU": false,
-    "toolchains": [
-      {
-        "repo": "https://github.com/kdrag0n/proton-clang",
-        "branch": "master",
-        "name": "proton-clang",
-        "binPath": ["bin"]
-      }
-    ],
-    "ccache":true,
-    "params": {
-      "ARCH": "arm64",
-      "CC": "proton-clang/bin/clang",
-      "externalCommand": {
-        "CROSS_COMPILE": "proton-clang/bin/aarch64-linux-gnu-",
-        "CROSS_COMPILE_ARM32": "proton-clang/bin/arm-linux-gnueabi-",
-        "LD": "proton-clang/bin/ld.lld",
-        "AR": "proton-clang/bin/llvm-ar",
-        "NM": "proton-clang/bin/llvm-nm",
-        "OBJCOPY": "proton-clang/bin/llvm-objcopy",
-        "OBJDUMP": "proton-clang/bin/llvm-objdump",
-        "READELF": "proton-clang/bin/llvm-readelf",
-        "OBJSIZE": "proton-clang/bin/llvm-size",
-        "STRIP": "proton-clang/bin/llvm-strip",
-        "LDGOLD": "proton-clang/bin/aarch64-linux-gnu-ld.gold",
-        "LLVM_AR": "proton-clang/bin/llvm-ar",
-        "LLVM_DIS": "proton-clang/bin/llvm-dis"
+        "CROSS_COMPILE": "clang-crDroid/bin/aarch64-linux-gnu-",
+        "CROSS_COMPILE_ARM32": "clang-crDroid/bin/arm-linux-gnueabi-",
+        "LD": "clang-crDroid/bin/ld.lld",
+        "LLVM": "1",
+        "LLVM_IAS": "1",
+        "AR": "clang-crDroid/bin/llvm-ar",
+        "NM": "clang-crDroid/bin/llvm-nm",
+        "OBJCOPY": "clang-crDroid/bin/llvm-objcopy",
+        "OBJDUMP": "clang-crDroid/bin/llvm-objdump",
+        "READELF": "clang-crDroid/bin/llvm-readelf",
+        "OBJSIZE": "clang-crDroid/bin/llvm-size",
+        "STRIP": "clang-crDroid/bin/llvm-strip",
+        "LDGOLD": "clang-crDroid/bin/aarch64-linux-gnu-ld.gold",
+        "LLVM_AR": "clang-crDroid/bin/llvm-ar",
+        "LLVM_DIS": "clang-crDroid/bin/llvm-dis"
       }
     },
     "AnyKernel3": {
       "use": true,
       "release": false,
-      "repo": "https://github.com/easterNday/AnyKernel3/",
-      "branch": "thyme"
+      "repo": "https://github.com/cvnertnc/AnyKernel3/",
+      "branch": "begonia"
     }
   }
 ]
 ```
 
-</details>
+## Field reference
 
-<details>
-  <summary>Individual Configuration Template</summary>
+### `kernelName`
+
+Type: `string`
+
+A short name for the build target. This is used in the workflow for file naming and matrix labeling.
+
+Example:
 
 ```json
-{
-  "kernelSource": {
-    "name": "",
-    "repo": "",
-    "branch": "",
-    "device": "",
-    "defconfig": ""
-  },
-  "withKernelSU": false,
-  "toolchains": [
-    {
-      "repo": "",
-      "branch": "",
-      "name": "",
-      "binPath": []
-    }
-  ],
-  "ccache": false,
-  "params": {
-    "ARCH": "",
-    "CC": "",
-    "externalCommand": {}
-  },
-  "AnyKernel3": {
-    "use": false,
-    "release": false,
-    "repo": "",
-    "branch": ""
-  }
+"kernelName": "power"
+```
+
+### `kernelSource`
+
+Type: `object`
+
+Contains the kernel source repository metadata.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `device` | string | yes | Device codename, e.g. `begonia` |
+| `defconfig` | string | yes | Defconfig used by `make`, e.g. `begonia_user_defconfig` |
+| `name` | string | yes | Friendly kernel name shown in build output and release naming |
+| `repo` | string | yes | Git URL of the kernel source repository |
+| `branch` | string | yes | Source branch to clone |
+
+Example:
+
+```json
+"kernelSource": {
+  "device": "begonia",
+  "defconfig": "begonia_user_defconfig",
+  "name": "Power-KSU-Next-SUSFS",
+  "repo": "https://github.com/Saikrishna1504/kernel_xiaomi_mt6785",
+  "branch": "bka"
 }
 ```
 
-</details>
+### `withRoot`
 
-#### Parameter Parsing
+Type: `string`
 
-In general, there are the following fields:
+Which root solution to integrate into the kernel.
 
-| Field Name   | Description                                                                                                                           |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| kernelSource | Information about the kernel source code, including name, repository address, branch, and device type.                                |
-| withKernelSU | A boolean value indicating whether the `KernelSU` was used.                                                                           |
-| toolchains   | An array containing information about the toolchains needed, including repository address, branch, and name.                          |
-| ccache       | A boolean value indicating whether the `ccache` tool was used to speed up compile.                                                    |
-| params       | An object containing information about the build parameters, including architecture type, cross-compiler, compiler, etc.              |
-| AnyKernel3   | An object containing information about building the kernel flash package, including the `AnyKernel3` repository address, branch, etc. |
+Supported values:
 
-###### Kernel Source Configuration (kernelSource)
+- `none`
+- `ksu`
+- `sukisu`
+- `ksun`
 
-| Kernel Source Parameter | Type   | Description                      | Explanation                                                                                                                                  |
-| ----------------------- | ------ | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`                  | String | Kernel Name                      | Customized, will be used in the release.                                                                                                     |
-| `repo`                  | String | Kernel Source Repository Address | The `git` repository address of the kernel source code.                                                                                      |
-| `branch`                | String | Kernel Source Branch             | The specified branch of the repository.                                                                                                      |
-| `device`                | String | Device Code                      | The device code or name to be compiled, will be used in the release.                                                                         |
-| `defconfig`             | String | Kernel Configuration File Name   | The prefix of the corresponding `defconfig` file to be compiled, for example, if the `defconfig` file is `thyme_defconfig`, fill in `thyme`. |
+Example:
 
-###### Toolchain Configuration (toolchains)
+```json
+"withRoot": "ksun"
+```
 
-This is an array that contains many repository objects of cross-compilation toolchains, and the parameter description of each configuration object is as follows:
+### `withSUSFS`
 
-| Toolchain Parameter | Type   | Description                  | Explanation                                                                                                                                                                           |
-| ------------------- | ------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `repo`              | String | Toolchain Repository Address | The `git` repository address of the toolchain.                                                                                                                                        |
-| `branch`            | String | Toolchain Branch             | The specified branch of the repository.                                                                                                                                               |
-| `url`               | String | Toolchain Download Url       | The download url of the toolchain.                                                                                                                                                    |
-| `name`              | String | Toolchain Name               | The name of the folder cloned locally, customized.                                                                                                                                    |
-| `binPath`           | Array  | Toolchain Binary File Path   | The path of the `bin` file used during compilation (relative to the path of the cloned folder). It will be converted to an **absolute path** during parameter setting when compiling. |
+Type: `boolean`
 
-Therefore, you can use the following forms to obtain the compilation toolchain:
+Enable SUSFS patching when a supported root solution is selected.
 
-######## 1. Use `Git` to pull the toolchain
+Example:
+
+```json
+"withSUSFS": true
+```
+
+### `whichSUSFS`
+
+Type: `boolean|string`
+
+Used to select the SUSFS variant. In current configs, this is often a string such as `"susfs-159"`.
+
+When not used, set it to `false`.
+
+Example:
+
+```json
+"whichSUSFS": "susfs-159"
+```
+
+### `withKPM`
+
+Type: `boolean`
+
+Enable KPM injection for supported kernels / root setups.
+
+Example:
+
+```json
+"withKPM": false
+```
+
+### `toolchains`
+
+Type: `array`
+
+Each item defines a compiler or toolchain repo to clone and add to `PATH`.
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `repo` | string | conditional | Git repo URL for a toolchain |
+| `url` | string | conditional | Direct download URL for a tar/zip archive |
+| `branch` | string | conditional | Branch for Git-based toolchain |
+| `name` | string | yes | Local folder name |
+| `binPath` | array | yes | Relative path(s) to add to `PATH` |
+
+Examples:
 
 ```json
 "toolchains": [
   {
-    "repo": "https://github.com/kdrag0n/proton-clang",
-    "branch": "master",
-    "name": "proton-clang",
+    "repo": "https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r547379",
+    "branch": "15.0",
+    "name": "clang-crDroid",
     "binPath": ["./bin"]
   }
 ]
 ```
 
-######## 2. Use `wget` to download the toolchain
-
-In this way, you can get the compiled toolchain compressed package in `.zip` | `.tar` | `.tar.gz` | `.rar` format.
+Archive download example:
 
 ```json
 "toolchains": [
   {
     "url": "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master-kernel-build-2022/clang-r450784d.tar.gz",
     "name": "clang",
-    "binPath": ["./bin"]
-  },
-  {
-    "url": "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz",
-    "name": "gcc",
     "binPath": ["bin"]
   }
 ]
 ```
 
-######## 3. Mixed mode (using `Git` and `wget` at the same time)
+### `ccache`
+
+Type: `boolean`
+
+Enable ccache for faster incremental kernel builds.
+
+Example:
 
 ```json
-"toolchains": [,
-  {
-    "repo": "https://gitlab.com/ThankYouMario/android_prebuilts_clang-standalone/",
-    "branch": "11",
-    "name": "clang",
-    "binPath": ["bin"]
-  },
-  {
-    "url": "https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz",
-    "name": "gcc",
-    "binPath": ["bin"]
-  }
-]
+"ccache": true
 ```
 
-###### Compilation Parameters (params)
+### `params`
 
-| Compilation Parameter | Type   | Description           | Explanation                                                            |
-| --------------------- | ------ | --------------------- | ---------------------------------------------------------------------- |
-| `ARCH`                | String | Architecture          | The architecture of the device, which can be queried using `uname -m`. |
-| `CC`                  | String | C Compiler Path       | The compiler used, usually `clang` or `gcc`.                           |
-| `externalCommand`     | Object | External Command Path | Additional parameter settings required for compilation.                |
+Type: `object`
 
-For the `externalCommand` part, here is an example of the command that may be used during compilation:
+Build arguments passed into the kernel make command.
 
-```sh
-make -j$(nproc --all) \
-      O=out \
-      ARCH=arm64 \
-      CC=clang \
-      CLANG_TRIPLE=aarch64-linux-gnu- \
-      CROSS_COMPILE=aarch64-linux-gnu- \
-      CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-```
+Common keys:
 
-The `-j` and `O=out` parts will be automatically configured by the compilation script, and the `ARCH` and `CC` parts correspond to the above configuration. The other parts correspond to the `externalCommand` part, so the corresponding configuration for the toolchains part should be:
+- `ARCH`: target architecture, usually `arm64`
+- `CC`: compiler path, such as `clang-crDroid/bin/clang`
+- `externalCommand`: extra flags passed to `make`
+
+Example:
 
 ```json
 "params": {
   "ARCH": "arm64",
-  "CC": "clang",
+  "CC": "clang-crDroid/bin/clang",
   "externalCommand": {
-    "CLANG_TRIPLE": "aarch64-linux-gnu-",
-    "CROSS_COMPILE": "proton-clang/bin/aarch64-linux-gnu-",
-    "CROSS_COMPILE_ARM32": "proton-clang/bin/arm-linux-gnueabi-"
+    "CROSS_COMPILE": "clang-crDroid/bin/aarch64-linux-gnu-",
+    "CROSS_COMPILE_ARM32": "clang-crDroid/bin/arm-linux-gnueabi-",
+    "LD": "clang-crDroid/bin/ld.lld",
+    "LLVM": "1",
+    "LLVM_IAS": "1"
   }
 }
 ```
 
-###### Kernel Flashing Package Configuration(AnyKernel3)
+### `AnyKernel3`
 
-| AnyKernel3 Parameter | Type    | Description                     | Explanation                                                                                                                   |
-| -------------------- | ------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `use`                | Boolean | Whether to use AnyKernel3       | If set to `false`, the corresponding kernel flashing package will not be packaged                                             |
-| `release`            | Boolean | Whether it is a release version | Only effective when `use` is set to `true`. If set to `false`, the corresponding kernel flashing package will not be released |
-| `repo`               | String  | AnyKernel3 repository address   | The repository address of the `Anykernel3` used                                                                               |
-| `branch`             | String  | AnyKernel3 branch               | The specified branch of the corresponding repository                                                                          |
+Type: `object`
 
-## How to use
+Controls packaging and optional release generation for the flashable zip.
 
-This project's basic usage is as follows:
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `use` | boolean | yes | Whether to package with AnyKernel3 |
+| `release` | boolean | yes | Whether to upload it as a GitHub release |
+| `repo` | string | yes | AnyKernel3 repository URL |
+| `branch` | string | yes | Branch to clone |
 
-1. Fork this project on GitHub.
+Example:
 
-2. Modify the `repos/repos*.json` file through the Github website or pull it to your local machine and commit the changes.
-
-3. Go to the `Action` page on Github and find `Build kernels`, then `Run workflow`.
-
-> **Notice**
->
-> In this step, you may encounter the following error when executing `softprops/action-gh-release@v1`:
->
-> ```
-> 👩‍🏭 Creating new GitHub release for tag v20230619.7...
-> ⚠️ GitHub release failed with status: 403
-> undefined
-> retrying... (2 retries remaining)
-> 👩‍🏭 Creating new GitHub release for tag v20230619.7...
-> ⚠️ GitHub release failed with status: 403
-> undefined
-> retrying... (1 retries remaining)
-> 👩‍🏭 Creating new GitHub release for tag v20230619.7...
-> ⚠️ GitHub release failed with status: 403
-> undefined
-> retrying... (0 retries remaining)
-> ❌ Too many retries. Aborting...
-> Error: Too many retries.
-> ```
->
-> The reason for this error is related to workflow permissions:
->
-> ![workflow permissions](./.assets/FAQ/workflow%20permissions.png)
->
-> Complete the permission settings and then you can publish your own `Release` normally.
-
-4. Wait for the compilation to finish, then download the compiled product from the corresponding page.
-
-5. Use your preferred packaging software to package the kernel ([AnyKernel3](https://github.com/osm0sis/AnyKernel3), [Android-Image-Kitchen](https://github.com/osm0sis/Android-Image-Kitchen), [MagiskBoot](https://github.com/topjohnwu/Magisk/releases), etc.)
-
-![Artifacts](./.assets/artifacts.png)
-
-## Local testing
-
-If you don't want to run the action on `Github`, you can use [nektos/act](https://github.com/nektos/act) to test this workflow locally and output the files.
-
-#### Normal local build (kernel source code is fetched using Git)
-
-This is the recommended local testing process. Simply install [nektos/act](https://github.com/nektos/act) and run the following command:
-
-```sh
-## Collect artifacts to /tmp/artifacts folder:
-act --artifact-server-path /tmp/artifacts
+```json
+"AnyKernel3": {
+  "use": true,
+  "release": false,
+  "repo": "https://github.com/cvnertnc/AnyKernel3/",
+  "branch": "begonia"
+}
 ```
 
-If you want to store the artifacts in a different location, change `/tmp/artifacts` to your preferred directory.
+## Minimal example
 
-If there are errors, use the `-v` flag to generate an error report and submit an issue. Here's the command:
-
-```sh
-## Collect artifacts to /tmp/artifacts folder:
-act --artifact-server-path /tmp/artifacts -v
+```json
+[
+  {
+    "kernelName": "power",
+    "kernelSource": {
+      "device": "begonia",
+      "defconfig": "begonia_user_defconfig",
+      "name": "Power-Non-Patches",
+      "repo": "https://github.com/Saikrishna1504/kernel_xiaomi_mt6785",
+      "branch": "bka"
+    },
+    "withRoot": "none",
+    "withSUSFS": false,
+    "whichSUSFS": false,
+    "withKPM": false,
+    "toolchains": [
+      {
+        "repo": "https://gitlab.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-r547379",
+        "branch": "15.0",
+        "name": "clang-crDroid",
+        "binPath": ["./bin"]
+      }
+    ],
+    "ccache": true,
+    "params": {
+      "ARCH": "arm64",
+      "CC": "clang-crDroid/bin/clang",
+      "externalCommand": {
+        "CROSS_COMPILE": "clang-crDroid/bin/aarch64-linux-gnu-",
+        "CROSS_COMPILE_ARM32": "clang-crDroid/bin/arm-linux-gnueabi-",
+        "LD": "clang-crDroid/bin/ld.lld"
+      }
+    },
+    "AnyKernel3": {
+      "use": true,
+      "release": false,
+      "repo": "https://github.com/cvnertnc/AnyKernel3/",
+      "branch": "begonia"
+    }
+  }
+]
 ```
 
-#### Full local build (kernel source code is stored locally)
+## How the workflow uses the config
 
-If you need to perform a completely local build, consider building as follows:
+The build workflow in `.github/workflows/build.yml` does this:
 
-1. Set up a local `Gitea` or `Gitlab` Git service and modify the configuration file address to point to the local service address.
+1. reads every `repos/repos*.json`
+2. merges them into a JSON matrix
+3. loops through each item
+4. clones the kernel source repository and toolchains
+5. applies root-related patches, SUSFS, and KPM when enabled
+6. runs `make ${defconfig}`
+7. builds the kernel
+8. repackages it with AnyKernel3 if enabled
 
-2. Use `git daemon` to create a secondary image locally.
+## Notes
 
-This is just a suggestion, and we do not provide a specific guide.
+- Use valid JSON syntax. Do not leave trailing commas.
+- Keep the `name` values unique if you plan to build multiple variants.
+- When you enable root integration, make sure the repo source and patches are compatible with the kernel branch you target.
+- `AnyKernel3.release` only matters when `AnyKernel3.use` is `true`.
 
-## TODO list
+## Recommended pattern for new builds
 
-- Use `MagiskBoot` to generate `boot.img`
-- Web page for configuring profiles
+For a new kernel variant, copy an existing entry in `repos/repos.power.json` and update only the values that differ:
+
+- `kernelName`
+- `kernelSource.name`
+- `kernelSource.repo`
+- `kernelSource.branch`
+- `kernelSource.device`
+- `kernelSource.defconfig`
+- `withRoot`
+- `withSUSFS` / `whichSUSFS`
+- `toolchains`
+- `params`
+- `AnyKernel3`
+
+This lets you quickly add new builds without changing the workflow logic.
