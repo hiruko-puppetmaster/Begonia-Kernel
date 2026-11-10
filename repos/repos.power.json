@@ -6,7 +6,7 @@
       "defconfig": "begonia_user_defconfig",
       "name": "Hiruko-Stable",
       "repo": "https://github.com/Saikrishna1504/kernel_xiaomi_mt6785",
-      "branch": "bka"
+      "branch": "main"
     },
     "withRoot": "ksun",
     "withSUSFS": false,
