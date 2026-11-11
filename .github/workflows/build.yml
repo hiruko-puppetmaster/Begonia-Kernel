@@ -289,18 +289,18 @@ jobs:
             curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
           else
             if [ -f "${WORKSPACE}/.github/script/ksun.sh" ]; then
-              bash "${WORKSPACE}/.github/script/ksun.sh" next
+              bash "${WORKSPACE}/.github/script/ksun.sh" v1.1.1
             else
-              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/v1.1.1/kernel/setup.sh" | bash -s v1.1.1
             fi
           fi
 
           if [ -d "KernelSU" ]; then
-            ROOT_VERSION=$(git -C KernelSU describe --abbrev=0 --tags || echo "unknown")
+            ROOT_VERSION=$(git -C KernelSU describe --abbrev=0 --tags || echo "v1.1.1")
           elif [ -d "KernelSU-Next" ]; then
-            ROOT_VERSION=$(git -C KernelSU-Next describe --abbrev=0 --tags || echo "unknown")
+            ROOT_VERSION=$(git -C KernelSU-Next describe --abbrev=0 --tags || echo "v1.1.1")
           else
-            ROOT_VERSION="unknown"
+            ROOT_VERSION="v1.1.1"
           fi
 
           if [ -n "${GITHUB_OUTPUT:-}" ]; then
@@ -314,6 +314,7 @@ jobs:
             "CONFIG_HAVE_KPROBES=y" \
             "CONFIG_KPROBE_EVENTS=y" \
             "CONFIG_KSU=y" \
+            "CONFIG_KSU_WITH_KPROBES=y" \
             "CONFIG_OVERLAY_FS=y" \
             "CONFIG_TMPFS_XATTR=y" >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
 
