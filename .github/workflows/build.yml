@@ -120,7 +120,7 @@ jobs:
           restore-keys: |
             ccache-${{ env.KERNEL_NAME }}-${{ steps.ccache_key.outputs.CACHE_KEY }}-${{ env.builddate }}
 
-      -       - name: "⏰ Setup Anykernel3"
+      - name: "⏰ Setup Anykernel3"
         env:
           params: "${{ toJSON(matrix.repos.AnyKernel3) }}"
         run: |
