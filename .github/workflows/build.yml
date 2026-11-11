@@ -25,12 +25,12 @@ jobs:
       - name: "😄 Checkout"
         uses: actions/checkout@v3
 
-      - name: "😄 Generate Matrix"
+      - name: "😆 Generate Matrix"
         id: generate-matrix
         shell: bash
         run: |
           echo "repos<<EOF" >> $GITHUB_OUTPUT
-          jq -s '.[][]' repos/repos*.json >> $GITHUB_OUTPUT
+          jq -c -s '[.[][]]' repos/repos*.json >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: "⏰ Set builddate"
@@ -39,7 +39,7 @@ jobs:
         run: echo "builddate=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
 
   Build-Kernel:
-    name: "🐅 Build kernel"
+    name: "🐫 Build kernel"
     runs-on: ubuntu-latest
     if: github.repository == 'who-ssasori/Begonia-Kernel'
     needs:
@@ -116,7 +116,7 @@ jobs:
           set -euxo pipefail
           gh run list -L400 --json databaseId -q '.[].databaseId' | tail -n+5 | xargs -IID gh api "repos/$GITHUB_REPOSITORY/actions/runs/ID" -X DELETE || :
 
-      - name: "🚣 Create cache key from `repos`"
+      - name: "🌊 Create cache key from `repos`"
         if: ${{ env.ccache == 'true' }}
         id: ccache_key
         shell: bash
@@ -125,7 +125,7 @@ jobs:
           ccache -o compression=false -o cache_dir=$HOME/.ccache
           echo "CACHE_KEY=$(echo -n '${{ toJSON(matrix.repos) }}' | base64 -w 0 | cut -c -48)" >> $GITHUB_OUTPUT
 
-      - name: "🛋️ Cache ccache files"
+      - name: "🛁 Cache ccache files"
         if: ${{ env.ccache == 'true' }}
         uses: actions/cache@v3
         with:
@@ -174,7 +174,7 @@ jobs:
           echo -e "\n⚠️ Kernel is at commit: $(git -C "$KERNEL_NAME" rev-parse HEAD)\n"
           echo "🤔 Clone kernel source => ($KERNEL_REPO)"
 
-      - name: "🔑 Get toolchains"
+      - name: "🍕 Get toolchains"
         shell: bash
         run: |
           set -euxo pipefail
@@ -268,7 +268,7 @@ jobs:
           echo "ARCH=$ARCH" >> $GITHUB_OUTPUT
           echo "args=$args" >> $GITHUB_OUTPUT
 
-      - name: "🛰️ Receiving scripts"
+      - name: "🦩 Receiving scripts"
         id: receiving-scripts
         working-directory: ${{ env.KERNEL_NAME }}
         shell: bash
@@ -286,7 +286,7 @@ jobs:
             echo "⬇️ Downloading encrypted BKB archive..."
             wget -q -O sus.zip.enc "$SUS_URL"
 
-            echo "🔓 Decrypting..."
+            echo "🔐 Decrypting..."
             openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
               -in sus.zip.enc -out sus.zip \
               -pass env:SUS_PASSWORD
@@ -295,7 +295,7 @@ jobs:
             unzip -q sus.zip -d BKB/
             rm -f sus.zip sus.zip.enc
           elif [ -f "${WORKSPACE}/.github/script/susfs4ksu.zip.enc" ] && [ -n "${SUS_PASSWORD:-}" ]; then
-            echo "🔓 Decrypting bundled susfs4ksu.zip.enc archive..."
+            echo "🔐 Decrypting bundled susfs4ksu.zip.enc archive..."
             openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
               -in "${WORKSPACE}/.github/script/susfs4ksu.zip.enc" -out sus.zip \
               -pass env:SUS_PASSWORD
@@ -353,9 +353,9 @@ jobs:
           else
             rm -rf ./KernelSU ./KernelSU-Next ./drivers/kernelsu
 
-            if [[ "$withRoot" == "ksu" ]]; then
+            if [[ "${withRoot:-}" == "ksu" ]]; then
               curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s master
-            elif [[ "$withRoot" == "sukisu" ]]; then
+            elif [[ "${withRoot:-}" == "sukisu" ]]; then
               curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
             else
               if [ -f "${WORKSPACE}/.github/script/ksun.sh" ]; then
@@ -373,19 +373,21 @@ jobs:
               ROOT_VERSION="unknown"
             fi
 
-            echo "ROOT_VERSION=${ROOT_VERSION}" >> "$GITHUB_OUTPUT"
+            if [ -n "${GITHUB_OUTPUT:-}" ]; then
+              echo "ROOT_VERSION=${ROOT_VERSION}" >> "$GITHUB_OUTPUT"
+            fi
 
             echo -e 'CONFIG_KSU=y' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
-            if [[ "$withRoot" == "sukisu" ]]; then
-              if [[ "$withKPM" == "true" ]]; then
+            if [[ "${withRoot:-}" == "sukisu" ]]; then
+              if [[ "${withKPM:-}" == "true" ]]; then
                 echo -e 'CONFIG_KPM=y' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
               fi
               echo -e 'CONFIG_KSU_MANUAL_HOOK=y' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
-            elif [[ "$withRoot" == "ksun" ]]; then
+            elif [[ "${withRoot:-}" == "ksun" ]]; then
               echo -e 'CONFIG_KSU_WITH_KPROBES=n' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
             fi
 
-            if [[ "$KNAME" == "astera" || "$KNAME" == "nova" ]]; then
+            if [[ "${KNAME:-}" == "astera" || "${KNAME:-}" == "nova" ]]; then
               patch -p1 < BKB/kernel_patches/0001-standard-ksu-hook_1.patch
             else
               patch -p1 < BKB/kernel_patches/0001-standard-ksu-hook_2.patch
@@ -416,7 +418,7 @@ jobs:
             cp -v "BKB/kernel_patches/${whichSUSFS}/fs/"* fs/
             cp -v "BKB/kernel_patches/${whichSUSFS}/include/linux/"* include/linux/
 
-            if [[ "$withRoot" == "ksun" ]]; then
+            if [[ "${withRoot:-}" == "ksun" ]]; then
               KSU_DIR="KernelSU"
               if [ ! -d "$KSU_DIR" ] && [ -d "KernelSU-Next" ]; then
                 KSU_DIR="KernelSU-Next"
@@ -424,10 +426,10 @@ jobs:
               patch -d "$KSU_DIR" -p1 < "BKB/kernel_patches/${whichSUSFS}/KernelSU/10_enable_susfs_for_ksun.patch"
             else
               rm -rf ./KernelSU ./drivers/kernelsu
-              if [[ "$withRoot" == "ksu" ]]; then
+              if [[ "${withRoot:-}" == "ksu" ]]; then
                 curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s 12104+155
               else
-                if [[ "$whichSUSFS" == "157" ]]; then
+                if [[ "${whichSUSFS:-}" == "157" ]]; then
                   curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-1.5.7
                 else
                   curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
@@ -435,7 +437,7 @@ jobs:
               fi
             fi
 
-            if [[ "$KNAME" == "nova" || "$KNAME" == "power" ]]; then
+            if [[ "${KNAME:-}" == "nova" || "${KNAME:-}" == "power" ]]; then
               patch -p1 < "BKB/kernel_patches/${whichSUSFS}/50_add_susfs_in_kernel-4.14_2.patch"
             else
               patch -p1 < "BKB/kernel_patches/${whichSUSFS}/50_add_susfs_in_kernel-4.14_1.patch"
