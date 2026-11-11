@@ -268,69 +268,6 @@ jobs:
           echo "ARCH=$ARCH" >> $GITHUB_OUTPUT
           echo "args=$args" >> $GITHUB_OUTPUT
 
-      - name: "🦩 Receiving scripts"
-        id: receiving-scripts
-        working-directory: ${{ env.KERNEL_NAME }}
-        shell: bash
-        env:
-          SUS_URL: ${{ secrets.SUS_URL }}
-          SUS_PASSWORD: ${{ secrets.SUS_PASSWORD }}
-        run: |
-          set -euxo pipefail
-
-          if [ -d "./BKB" ]; then
-            rm -rf "./BKB"
-          fi
-
-          if [ -n "${SUS_URL:-}" ] && [ -n "${SUS_PASSWORD:-}" ]; then
-            echo "⬇️ Downloading encrypted BKB archive..."
-            wget -q -O sus.zip.enc "$SUS_URL"
-
-            echo "🔐 Decrypting..."
-            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
-              -in sus.zip.enc -out sus.zip \
-              -pass env:SUS_PASSWORD
-
-            mkdir -p BKB
-            unzip -q sus.zip -d BKB/
-            rm -f sus.zip sus.zip.enc
-          elif [ -f "${WORKSPACE}/.github/script/susfs4ksu.zip.enc" ] && [ -n "${SUS_PASSWORD:-}" ]; then
-            echo "🔐 Decrypting bundled susfs4ksu.zip.enc archive..."
-            openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 \
-              -in "${WORKSPACE}/.github/script/susfs4ksu.zip.enc" -out sus.zip \
-              -pass env:SUS_PASSWORD
-
-            mkdir -p BKB
-            unzip -q sus.zip -d BKB/
-            rm -f sus.zip
-          else
-            echo "⬇️ Cloning public susfs4ksu-begonia archive..."
-            git clone --recursive --depth=1 -j "$(nproc)" --branch main https://github.com/vc-teahouse/susfs4ksu-begonia BKB
-          fi
-
-          echo "✅ BKB scripts ready at $(pwd)/BKB"
-
-      - name: "💉 APatch, SukiSU setup and [BACKPORT]: ptrace"
-        id: apatch-sukisu-setup
-        working-directory: ${{ env.KERNEL_NAME }}
-        shell: bash
-        env:
-          arch: ${{ steps.generate-args.outputs.ARCH }}
-          DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          set -euxo pipefail
-
-          BKB_YML=releases
-          if [ -f "BKB/kernel_patches/bkb/$BKB_YML/apatch_sukisu_setup.sh" ]; then
-            chmod +x "BKB/kernel_patches/bkb/$BKB_YML/apatch_sukisu_setup.sh"
-            "./BKB/kernel_patches/bkb/$BKB_YML/apatch_sukisu_setup.sh"
-          else
-            echo -e 'CONFIG_KALLSYMS_ALL=y' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
-            patch -p1 < BKB/kernel_patches/0001-main-patch-kernel.patch
-            curl -LSs https://github.com/sidex15/android_kernel_lge_sm8150/commit/fcc59dc3310d3a1511d02dc3ac6d1e113517ece1.patch | patch -p1
-          fi
-
       - name: "😋 Integrate KernelSU or KernelSU-Next"
         id: integrate-kernelsu-next
         working-directory: ${{ env.KERNEL_NAME }}
@@ -339,131 +276,46 @@ jobs:
         env:
           arch: ${{ steps.generate-args.outputs.ARCH }}
           DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
-          GH_PAT: ${{ secrets.GH_PAT }}
           withRoot: ${{ env.withRoot }}
           withKPM: ${{ env.withKPM }}
-          KNAME: ${{ env.KNAME }}
         run: |
           set -euxo pipefail
 
-          BKB_YML=releases
-          if [ -f "BKB/kernel_patches/bkb/$BKB_YML/integrate_kernelsu.sh" ]; then
-            chmod +x "BKB/kernel_patches/bkb/$BKB_YML/integrate_kernelsu.sh"
-            "./BKB/kernel_patches/bkb/$BKB_YML/integrate_kernelsu.sh"
+          rm -rf ./KernelSU ./KernelSU-Next ./drivers/kernelsu
+
+          if [[ "${withRoot:-}" == "ksu" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s master
+          elif [[ "${withRoot:-}" == "sukisu" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
           else
-            rm -rf ./KernelSU ./KernelSU-Next ./drivers/kernelsu
-
-            if [[ "${withRoot:-}" == "ksu" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s master
-            elif [[ "${withRoot:-}" == "sukisu" ]]; then
-              curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s nongki
+            if [ -f "${WORKSPACE}/.github/script/ksun.sh" ]; then
+              bash "${WORKSPACE}/.github/script/ksun.sh" next
             else
-              if [ -f "${WORKSPACE}/.github/script/ksun.sh" ]; then
-                bash "${WORKSPACE}/.github/script/ksun.sh" next
-              else
-                curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
-              fi
-            fi
-
-            if [ -d "KernelSU" ]; then
-              ROOT_VERSION=$(git -C KernelSU describe --abbrev=0 --tags || echo "unknown")
-            elif [ -d "KernelSU-Next" ]; then
-              ROOT_VERSION=$(git -C KernelSU-Next describe --abbrev=0 --tags || echo "unknown")
-            else
-              ROOT_VERSION="unknown"
-            fi
-
-            if [ -n "${GITHUB_OUTPUT:-}" ]; then
-              echo "ROOT_VERSION=${ROOT_VERSION}" >> "$GITHUB_OUTPUT"
-            fi
-
-            echo -e 'CONFIG_KSU=y' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
-            if [[ "${withRoot:-}" == "sukisu" ]]; then
-              if [[ "${withKPM:-}" == "true" ]]; then
-                echo -e 'CONFIG_KPM=y' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
-              fi
-              echo -e 'CONFIG_KSU_MANUAL_HOOK=y' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
-            elif [[ "${withRoot:-}" == "ksun" ]]; then
-              echo -e 'CONFIG_KSU_WITH_KPROBES=n' >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
-            fi
-
-            if [[ "${KNAME:-}" == "astera" || "${KNAME:-}" == "nova" ]]; then
-              patch -p1 < BKB/kernel_patches/0001-standard-ksu-hook_1.patch
-            else
-              patch -p1 < BKB/kernel_patches/0001-standard-ksu-hook_2.patch
+              curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
             fi
           fi
 
-      - name: "🥷 Add SUSFS patches"
-        id: add-susfs-patches
-        working-directory: ${{ env.KERNEL_NAME }}
-        if: ${{ (env.withRoot == 'ksu' || env.withRoot == 'sukisu' || env.withRoot == 'ksun') && env.withSUSFS == 'true' }}
-        shell: bash
-        env:
-          arch: ${{ steps.generate-args.outputs.ARCH }}
-          DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
-          GH_PAT: ${{ secrets.GH_PAT }}
-          withRoot: ${{ env.withRoot }}
-          withSUSFS: ${{ env.withSUSFS }}
-          whichSUSFS: ${{ matrix.repos.whichSUSFS }}
-          KNAME: ${{ env.KNAME }}
-        run: |
-          set -euxo pipefail
-
-          BKB_YML=releases
-          if [ -f "BKB/kernel_patches/bkb/$BKB_YML/add_susfs_patches.sh" ]; then
-            chmod +x "BKB/kernel_patches/bkb/$BKB_YML/add_susfs_patches.sh"
-            "./BKB/kernel_patches/bkb/$BKB_YML/add_susfs_patches.sh"
+          if [ -d "KernelSU" ]; then
+            ROOT_VERSION=$(git -C KernelSU describe --abbrev=0 --tags || echo "unknown")
+          elif [ -d "KernelSU-Next" ]; then
+            ROOT_VERSION=$(git -C KernelSU-Next describe --abbrev=0 --tags || echo "unknown")
           else
-            cp -v "BKB/kernel_patches/${whichSUSFS}/fs/"* fs/
-            cp -v "BKB/kernel_patches/${whichSUSFS}/include/linux/"* include/linux/
-
-            if [[ "${withRoot:-}" == "ksun" ]]; then
-              KSU_DIR="KernelSU"
-              if [ ! -d "$KSU_DIR" ] && [ -d "KernelSU-Next" ]; then
-                KSU_DIR="KernelSU-Next"
-              fi
-              patch -d "$KSU_DIR" -p1 < "BKB/kernel_patches/${whichSUSFS}/KernelSU/10_enable_susfs_for_ksun.patch"
-            else
-              rm -rf ./KernelSU ./drivers/kernelsu
-              if [[ "${withRoot:-}" == "ksu" ]]; then
-                curl -LSs "https://raw.githubusercontent.com/backslashxx/KernelSU/master/kernel/setup.sh" | bash -s 12104+155
-              else
-                if [[ "${whichSUSFS:-}" == "157" ]]; then
-                  curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-1.5.7
-                else
-                  curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-                fi
-              fi
-            fi
-
-            if [[ "${KNAME:-}" == "nova" || "${KNAME:-}" == "power" ]]; then
-              patch -p1 < "BKB/kernel_patches/${whichSUSFS}/50_add_susfs_in_kernel-4.14_2.patch"
-            else
-              patch -p1 < "BKB/kernel_patches/${whichSUSFS}/50_add_susfs_in_kernel-4.14_1.patch"
-            fi
-
-            printf '%s\n' \
-              "#Susfs4ksu" \
-              "CONFIG_KSU_SUSFS=y" \
-              "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" \
-              "CONFIG_KSU_SUSFS_SUS_PATH=y" \
-              "CONFIG_KSU_SUSFS_SUS_MOUNT=y" \
-              "CONFIG_KSU_SUSFS_SUS_KSTAT=y" \
-              "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y" \
-              "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" \
-              "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" \
-              "CONFIG_KSU_SUSFS_ENABLE_LOG=y" \
-              "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" \
-              "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" \
-              "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" \
-              "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" \
-              "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" \
-              "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" \
-              "#Mountify" \
-              "CONFIG_OVERLAY_FS=y" \
-              "CONFIG_TMPFS_XATTR=y" >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
+            ROOT_VERSION="unknown"
           fi
+
+          if [ -n "${GITHUB_OUTPUT:-}" ]; then
+            echo "ROOT_VERSION=${ROOT_VERSION}" >> "$GITHUB_OUTPUT"
+          fi
+
+          printf '%s\n' \
+            "CONFIG_KALLSYMS=y" \
+            "CONFIG_KALLSYMS_ALL=y" \
+            "CONFIG_KPROBES=y" \
+            "CONFIG_HAVE_KPROBES=y" \
+            "CONFIG_KPROBE_EVENTS=y" \
+            "CONFIG_KSU=y" \
+            "CONFIG_OVERLAY_FS=y" \
+            "CONFIG_TMPFS_XATTR=y" >> "arch/${arch}/configs/${DEFCONFIG_NAME}"
 
       - name: "👍 Make defconfig"
         working-directory: ${{ env.KERNEL_NAME }}
@@ -488,39 +340,6 @@ jobs:
 
           echo "Checking expected boot image..."
           find "${{ env.OUT_DIR }}" -path "*/boot/Image.gz" -o -path "*/boot/Image" | head -n 20
-
-      - name: "☯️ KPM Injection"
-        id: kpm-inject
-        working-directory: ${{ env.KERNEL_NAME }}
-        if: ${{ env.withRoot == 'sukisu' && env.withKPM == 'true' }}
-        shell: bash
-        env:
-          arch: ${{ steps.generate-args.outputs.ARCH }}
-          OUT_DIR: ${{ env.OUT_DIR }}
-        run: |
-          set -euxo pipefail
-
-          BKB_YML=releases
-          if [ -f "BKB/kernel_patches/bkb/$BKB_YML/kpm_injection.sh" ]; then
-            chmod +x "BKB/kernel_patches/bkb/$BKB_YML/kpm_injection.sh"
-            "./BKB/kernel_patches/bkb/$BKB_YML/kpm_injection.sh"
-          else
-            mkdir -p ~/SukiSUPatch
-            cd ~/SukiSUPatch
-            TAG=$(curl -s https://api.github.com/repos/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases | \
-              jq -r 'map(select(.prerelease)) | first | .tag_name')
-            echo "Latest tag is: $TAG"
-            curl -Ls -o patch_linux "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/$TAG/patch_linux"
-            chmod +x patch_linux
-            mv "${OUT_DIR}/arch/${arch}/boot/Image" ~/SukiSUPatch/Image
-            rm -rf "${OUT_DIR}/arch/${arch}/boot/Image.gz"
-            ./patch_linux
-            rm -rf ./Image
-            mv -f oImage Image
-            gzip -k Image
-            mv ~/SukiSUPatch/Image.gz "${OUT_DIR}/arch/${arch}/boot/Image.gz"
-            cd ..
-          fi
 
       - name: "✏️ Set root version fallback"
         id: root-version
@@ -595,3 +414,4 @@ jobs:
           files: "${{ env.WORKSPACE }}/${{ env.KERNEL_DEVICE }}-${{ env.ROOT_VERSION }}-${{ env.KERNEL_NAME }}-${{ env.builddate }}.zip"
           fail_on_unmatched_files: true
           preserve_order: true
+          
