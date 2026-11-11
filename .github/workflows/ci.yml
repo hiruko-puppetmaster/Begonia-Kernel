@@ -8,7 +8,7 @@ on:
 jobs:
   check-updates:
     runs-on: ubuntu-latest
-    if: github.repository_owner == 'cvnertnc' && github.repository == 'cvnertnc/Begonia-Kernel-Builder'
+    if: github.repository == 'who-ssasori/Begonia-Kernel'
 
     steps:
       - name: Checkout the repository
@@ -20,19 +20,19 @@ jobs:
           declare -A repos=(
             ["KernelSU-Next"]="KernelSU-Next/KernelSU-Next@next"
           )
-          
+
           touch new_build.md
-          
+
           for key in "${!repos[@]}"; do
             IFS='@' read -r repo branch <<< "${repos[$key]}"
-            
+
             response=$(curl -s "https://api.github.com/repos/${repo}/commits/${branch}")
             latest_commit=$(echo "$response" | jq -r '.sha')
             latest_date=$(echo "$response" | jq -r '.commit.author.date')
-          
+
             echo "${key}_commit=$latest_commit" >> $GITHUB_ENV
             echo "${key}_date=$latest_date" >> $GITHUB_ENV
-          
+
             echo "$key Commit ID: $latest_commit" >> new_build.md
             echo "$key Commit Date: $latest_date" >> new_build.md
             echo "" >> new_build.md
@@ -101,7 +101,7 @@ jobs:
   build:
     permissions: write-all
     needs: check-updates
-    uses: ./.github/workflows/build-release.yml
+    uses: ./.github/workflows/build.yml
     if: ${{ needs.check-updates.outputs.update == 'true' || needs.check-updates.outputs.branch_exists == 'false' }}
     secrets: inherit
 
@@ -114,5 +114,5 @@ jobs:
           curl -X POST \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/cvnertnc/Begonia-Kernel-Builder/dispatches \
-            -d '{"event_type": "trigger-telegram-report"}'
+            "https://api.github.com/repos/${{ github.repository }}/dispatches" \
+            -d '{"event_type":"trigger-telegram-report"}'
