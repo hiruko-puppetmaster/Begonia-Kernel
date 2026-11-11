@@ -1,5 +1,8 @@
 name: "Build kernels for release"
 
+permissions:
+  contents: write
+
 env:
   OUT_DIR: "${{ github.workspace }}/out"
 
@@ -44,6 +47,8 @@ jobs:
     if: github.repository == 'who-ssasori/Begonia-Kernel'
     needs:
       - Set-repos
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -405,14 +410,14 @@ jobs:
         env:
           ROOT_VERSION: ${{ steps.root-version.outputs.ROOT_VERSION }}
         with:
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
           tag_name: v${{ env.builddate }}
           name: v${{ env.builddate }}
           make_latest: true
           prerelease: false
           draft: false
           generate_release_notes: false
-          body: "Power kernel By [Saikrishna1504](https://github.com/Saikrishna1504)\nBuild with Github by [cvnertnc](https://github.com/cvnertnc)\nAll Linux kernel patched with [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)\nKernelSU-Next is the best root solution for Android devices.\n"
+          body: "Power kernel By [Saikrishna1504](https://github.com/Saikrishna1504)\nBuild with Github by [cvnertnc](https://github.com/cvnertnc)\nAll Linux kernel patched with [KernelSU-Next](https://github.com/KernelSU-Next/KernelSU-Next)"
           files: "${{ env.WORKSPACE }}/${{ env.KERNEL_DEVICE }}-${{ env.ROOT_VERSION }}-${{ env.KERNEL_NAME }}-${{ env.builddate }}.zip"
           fail_on_unmatched_files: true
           preserve_order: true
-          
